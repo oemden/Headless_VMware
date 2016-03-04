@@ -1,0 +1,126 @@
+#/bin/bash -e
+
+## Most of the code taken and inspired from 
+## https://gist.github.com/jasoncodes/613198
+## Added checks to wait for the Disc to be mounted first.
+## oem at oemden dot com
+
+VMNAME="VM1" # Name fo the VM.
+HDDNAME="DATAS" # Name of the Volume where the VM is.
+TRYOUTS=2 #Edit the trying counts before giving up.
+
+VMHDD="/Volumes/${HDDNAME}"
+VMX="$VMHDD/VMs/${VMNAME}/${VMNAME}.vmwarevm/${VMNAME}.vmx" ## Edit according to your path
+
+function drive_mounted() {
+	disk=$(diskutil info "${VMHDD}" | grep "Could not find disk:")
+	if [[ $disk ]]; then
+		drive=KO
+		echo " Drive $VMHDD not found trying $WAIT more time(s)"
+		sleep 2
+	else
+		drive=OK
+		echo " Drive $VMHDD mounted"
+	fi
+}
+
+function check_if_drive_mounted() {
+	echo " -- Checking the Drive $HDDNAME is mounted -- "
+	local WAIT="$TRYOUTS"
+	drive_mounted
+	while [ $drive == KO ] ; do
+		local WAIT=$((WAIT - 1))
+		if [ $WAIT -le 0 ]
+		then
+			echo " - Timeout waiting for Hard Drive $VMHDD. - "
+			exit 1
+		fi
+		#sleep 1
+		unset drive
+		drive_mounted
+	done
+}
+
+## Check if the VM is there
+function verify_VM {
+	echo " -- Check if the VM is there --"
+	if [ ! -f "$VMX" ]
+		then
+			echo "$VMX" not found >&2
+			exit 1
+	else
+			echo "$VMX" found
+	fi
+}
+
+function wait_for_host0() {
+
+	echo " -- Check vmware drivers are loaded --" ## does not seems to be needed anymore (in fusion 8)
+	
+	local WAIT=180
+
+	#while ! [ -e /var/run/vmnet-bridge-vmnet.pid -o -e /var/run/vmnet-bridge-vmnet0.pid ]; do
+	while ! [ -e /var/run/vmnet-bridge*.pid -o -e /var/run/vmnet-bridge-vmnet0.pid ]; do
+		local WAIT=$((WAIT - 1))
+		if [ $WAIT -le 0 ]
+		then
+			echo Timeout waiting for VMware drivers.
+			exit 1
+		fi
+		sleep 1
+	done
+
+}
+
+function wait_for_host() {
+	local WAIT=180
+	echo " -- Check login -- "
+	while ! who | awk '{print $2}' | grep -q ^console$
+	do
+		local WAIT=$((WAIT - 1))
+		if [ $WAIT -le 0 ]
+		then
+			echo Timeout waiting for console login.
+			exit 1
+		fi
+		sleep 1
+	done
+}
+
+function is_running() {
+	echo " -- Check if VM $VMNAME is already loaded --"
+	local VMX="$1"
+	ps -eco pid=,command= | awk '{if ($2=="vmware-vmx") print $1}' | while read PID
+	do
+		if ps -o args= $PID | tr ' ' '\n' | grep -F "$VMX"
+		then
+			return 42 #found
+		fi
+	done
+	[ "$?" == "42" ]
+}
+
+function launch_vm() {
+	if is_running "$VMX"
+	then
+		echo "$1" already running. Attaching to existing.
+	else
+		#vmrun start "$VMX" nogui
+		/usr/bin/logger " -- Trying to start vmware VM's now..."
+		/usr/local/bin/vmrun -T fusion start "$VMX" nogui
+	fi
+}
+
+check_if_drive_mounted
+verify_VM
+wait_for_host
+launch_vm
+
+trap '/usr/local/bin/vmrun stop "$VMX" soft' SIGKILL SIGTERM SIGHUP SIGINT
+
+while is_running "$VMX"
+do
+	sleep 5
+done
+
+
