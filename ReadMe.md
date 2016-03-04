@@ -8,7 +8,7 @@ Just Added some checks to wait for the Disc contening the VM(s) to be mounted fi
 ##Clone the repo.
 
 ```
-git clone https://oemden.github.com/Headless_VMware
+git clone https://github.com/oemden/Headless_VMware
 cd Headless_VMware
 ```
 
@@ -48,16 +48,16 @@ Edit the .plist file and replace `VM1_headless` with the name you gave of the ab
 `chmod +x VM1_vmdaemon`
 
 - **Create the executable script**
-`mkdir -p "/Library/Application Support/VMwareHeadless/"`
+`sudo mkdir -p "/Library/Application Support/VMwareHeadless/"`
 
 - **Copy the script**
-`cp ./VM1_vmdaemon "/Library/Application Support/VMwareHeadless/"`
+`sudo cp ./VM1_vmdaemon "/Library/Application Support/VMwareHeadless/"`
 
 - **Copy the Launchd**
-`cp ./com.oemden.headless.VM1.plist "/Library/LaunchDaemon/com.oemden.headless.VM1.plist"`
+`sudo cp ./com.oemden.headless.VM1.plist "/Library/LaunchDaemon/com.oemden.headless.VM1.plist"`
 
 - **Launch the Daemon**
-`launchtl load -w /Library/LaunchDaemon/com.oemden.headless.VM1.plist`
+`sudo launchtl load -w /Library/LaunchDaemon/com.oemden.headless.VM1.plist`
 
 
 Repeat for each VM.
